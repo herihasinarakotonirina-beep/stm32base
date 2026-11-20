@@ -64,10 +64,10 @@ void setup()
     stepper.enableOutputs();
 
 xTaskCreate(tacheCAN_RX,    "CAN_RX",    128, NULL, 1, NULL);
- xTaskCreate(passerelle_CAN, "passerelle", 128, NULL, 1, NULL);
+ xTaskCreate(passerelle_CAN, "passerelle", 256, NULL, 1, NULL);
  xTaskCreate(tacheCAN_TX,    "CAN_TX",    128, NULL, 1, NULL);
-xTaskCreate(gestion_servo,  "servo",     256, NULL, 1, NULL);
-//xTaskCreate(gestion_moteur, "moteur",    256, NULL, 1, NULL);
+//xTaskCreate(gestion_servo,  "servo",     256, NULL, 1, NULL);
+xTaskCreate(gestion_moteur, "moteur",    256, NULL, 1, NULL);
 
     vTaskStartScheduler(); // lance le scheduler
 
@@ -150,7 +150,9 @@ void passerelle_CAN(void *pvParameters)
         position.buf[0] = (uint8_t)(servo_id); 
         position.buf[1] = (uint8_t)(servo_degres);
         position.buf[2] = (uint8_t)(servo_degres >> 8);
-        
+         xSemaphoreTake(Mutex, portMAX_DELAY);
+        Serial.printf("BIEN");
+        xSemaphoreGive(Mutex);       
         xQueueSend(q_tx_msg,&position,0);
         angle = (int16_t)(position.buf[1] | (position.buf[2] << 8));
         xSemaphoreTake(Mutex, portMAX_DELAY);
@@ -158,13 +160,13 @@ void passerelle_CAN(void *pvParameters)
         xSemaphoreGive(Mutex);
         }
 
-        // if(CAN_RX_recue.id == 0x10) // ordre pour la distance du pas à pas 
-        // {
+        if(CAN_RX_recue.id == 0x10) // ordre pour la distance du pas à pas 
+        {
             
-        //     xQueueSend(q_dist_msg,&CAN_RX_recue,0);
-        //     // dist_moteur=CAN_RX_recue.buf[0]|(CAN_RX_recue.buf[1]<<8);
-        //     // xQueueOverwrite(q_dist_msg,&dist_moteur);
-        // }
+            xQueueSend(q_dist_msg,&CAN_RX_recue,0);
+            // dist_moteur=CAN_RX_recue.buf[0]|(CAN_RX_recue.buf[1]<<8);
+            // xQueueOverwrite(q_dist_msg,&dist_moteur);
+        }
 
 
         // vTaskDelay(pdMS_TO_TICKS(100));
@@ -237,18 +239,23 @@ void gestion_moteur(void *pvParameters)
 
     stepper.setMaxSpeed(800);       
     stepper.setAcceleration(400);   
-
-    TickType_t xLastWakeTime = xTaskGetTickCount();   
+ 
+   TickType_t xLastWakeTime = xTaskGetTickCount();   
 
     while (1)
     {
-        pas = 1200;
-        // if (xQueueReceive(q_dist_msg, &CAN_distance, 0) == pdTRUE)
-        // {
-        //     pas = (int16_t)(CAN_distance.buf[0] | (CAN_distance.buf[1] << 8));
-        //     stepper.move(pas);
-        // }
+        if (xQueueReceive(q_dist_msg, &CAN_distance, 0) == pdTRUE)
+        {
+            
+            pas = (uint16_t)(CAN_distance.buf[0] | (CAN_distance.buf[1] << 8));
+            stepper.move(pas);
+        xSemaphoreTake(Mutex, portMAX_DELAY);
+        Serial.printf("la distance du moteur est %d\n", pas);
+        xSemaphoreGive(Mutex);
+           
+        }
         stepper.run();
+
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));   // période fixe de 1 ms
     }
 }
