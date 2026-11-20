@@ -63,11 +63,11 @@ void setup()
 
     stepper.enableOutputs();
 
-//xTaskCreate(tacheCAN_RX,    "CAN_RX",    256, NULL, 1, NULL);
-//xTaskCreate(passerelle_CAN, "passerelle", 512, NULL, 1, NULL);
-//xTaskCreate(tacheCAN_TX,    "CAN_TX",    512, NULL, 1, NULL);
-xTaskCreate(gestion_servo,  "servo",     512, NULL, 1, NULL);
-//xTaskCreate(gestion_moteur, "moteur",    256, NULL, 2, NULL);
+xTaskCreate(tacheCAN_RX,    "CAN_RX",    128, NULL, 1, NULL);
+ xTaskCreate(passerelle_CAN, "passerelle", 128, NULL, 1, NULL);
+ xTaskCreate(tacheCAN_TX,    "CAN_TX",    128, NULL, 1, NULL);
+xTaskCreate(gestion_servo,  "servo",     256, NULL, 1, NULL);
+//xTaskCreate(gestion_moteur, "moteur",    256, NULL, 1, NULL);
 
     vTaskStartScheduler(); // lance le scheduler
 
@@ -175,7 +175,7 @@ void gestion_servo(void *pvParameters)
     CAN_message_t erreur_servo;
     HerkulexStatusError erreur;
     HerkulexStatusDetail details;   
-    int angle_cons=-100;
+    int angle_cons=0;
     xSemaphoreTake(Mutex_servo, portMAX_DELAY);
     my_servo.setTorqueOn();
     envoie_ordre(angle_cons, 5);
