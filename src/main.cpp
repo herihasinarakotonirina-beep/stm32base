@@ -237,8 +237,7 @@ void gestion_moteur(void *pvParameters)
     CAN_message_t CAN_distance;
     int16_t pas;
     uint16_t vitesse;
-
-    stepper.setMaxSpeed(100);       
+      
     stepper.setAcceleration(30);   
  
    TickType_t xLastWakeTime = xTaskGetTickCount();   
@@ -249,8 +248,11 @@ void gestion_moteur(void *pvParameters)
         {
             
         pas = (uint16_t)(CAN_distance.buf[0] | (CAN_distance.buf[1] << 8));
+        vitesse= (uint16_t)(CAN_distance.buf[2]);
+        stepper.setMaxSpeed(vitesse); 
         xSemaphoreTake(Mutex, portMAX_DELAY);
         Serial.printf("la distance  est %d\n", pas);
+        Serial.printf("vitesse : %d\n", vitesse);
         xSemaphoreGive(Mutex);
         stepper.move(pas);           
         }
