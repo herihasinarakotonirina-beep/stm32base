@@ -66,8 +66,8 @@ void setup()
 xTaskCreate(tacheCAN_RX,    "CAN_RX",    128, NULL, 1, NULL);
  xTaskCreate(passerelle_CAN, "passerelle", 256, NULL, 1, NULL);
  xTaskCreate(tacheCAN_TX,    "CAN_TX",    128, NULL, 1, NULL);
-//xTaskCreate(gestion_servo,  "servo",     256, NULL, 1, NULL);
-xTaskCreate(gestion_moteur, "moteur",    256, NULL, 1, NULL);
+xTaskCreate(gestion_servo,  "servo",     256, NULL, 1, NULL);
+//xTaskCreate(gestion_moteur, "moteur",    256, NULL, 1, NULL);
 
     vTaskStartScheduler(); // lance le scheduler
 
@@ -149,10 +149,7 @@ void passerelle_CAN(void *pvParameters)
         position.len = 3;
         position.buf[0] = (uint8_t)(servo_id); 
         position.buf[1] = (uint8_t)(servo_degres);
-        position.buf[2] = (uint8_t)(servo_degres >> 8);
-         xSemaphoreTake(Mutex, portMAX_DELAY);
-        Serial.printf("BIEN");
-        xSemaphoreGive(Mutex);       
+        position.buf[2] = (uint8_t)(servo_degres >> 8);    
         xQueueSend(q_tx_msg,&position,0);
         angle = (int16_t)(position.buf[1] | (position.buf[2] << 8));
         xSemaphoreTake(Mutex, portMAX_DELAY);
@@ -161,29 +158,43 @@ void passerelle_CAN(void *pvParameters)
         }
 
         if(CAN_RX_recue.id == 0x10) // ordre pour la distance du pas à pas 
-        {
-            
+        {   
             xQueueSend(q_dist_msg,&CAN_RX_recue,0);
-            // dist_moteur=CAN_RX_recue.buf[0]|(CAN_RX_recue.buf[1]<<8);
-            // xQueueOverwrite(q_dist_msg,&dist_moteur);
         }
-
-
+        if (CAN_RX_recue.id == 0x15) // ordre pour l'angle consigne
+        {
+            xQueueSend(q_dist_msg,&CAN_RX_recue,0);
+        }
         // vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 void gestion_servo(void *pvParameters)
 {
     CAN_message_t erreur_servo;
+    CAN_message_t ordre_servo;
     HerkulexStatusError erreur;
     HerkulexStatusDetail details;   
-    int angle_cons=0;
+    int16_t angle_norm; // angle entre 0 et 360
+    int16_t angle_cons; // normaliser entre -160 et 160
+    
     xSemaphoreTake(Mutex_servo, portMAX_DELAY);
     my_servo.setTorqueOn();
-    envoie_ordre(angle_cons, 5);
     xSemaphoreGive(Mutex_servo);
     while (1)
     {
+
+        if (xQueueReceive(q_dist_msg,&ordre_servo,0))
+        {
+            angle_norm = (uint16_t)(ordre_servo.buf[0]| (ordre_servo.buf[1]<<8));
+        angle_cons= angle_norm-160;
+        xSemaphoreTake(Mutex, portMAX_DELAY);
+        Serial.printf("angle consinge :%d\n", angle_cons);
+        xSemaphoreGive(Mutex); 
+        xSemaphoreTake(Mutex_servo, portMAX_DELAY);     
+        envoie_ordre(angle_cons, 5);
+        xSemaphoreGive(Mutex_servo);
+        }
+  
         erreur_servo.id = 0x20;
         erreur_servo.len = 1;
         xSemaphoreTake(Mutex_servo, portMAX_DELAY);
@@ -215,10 +226,10 @@ void envoie_ordre(int position_deg, float vitesse)
     int pos_brute_depart = my_servo.getPosition();
     int pos_deg_depart = (pos_brute_depart - 512) * 0.325;
     int delta_pos;
-    if (position_deg > 160)
-        position_deg = 160;
-    if (position_deg < -160)
-        position_deg = -160;
+    if (position_deg > 150)
+        position_deg = 150;
+    if (position_deg < -150)
+        position_deg = -150;
     position_brute = 512 + ((position_deg) / 0.325);
     delta_pos = abs(position_deg - pos_deg_depart);
     temps_ms = (delta_pos / vitesse) * 1000;
