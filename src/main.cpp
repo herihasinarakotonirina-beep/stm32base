@@ -202,7 +202,7 @@ void gestion_servo(void *pvParameters)
             my_servo.setTorqueOff();
             xSemaphoreGive(Mutex_servo);
         }
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(50));  
     }
 }
 
@@ -236,9 +236,10 @@ void gestion_moteur(void *pvParameters)
 {
     CAN_message_t CAN_distance;
     int16_t pas;
+    uint16_t vitesse;
 
-    stepper.setMaxSpeed(800);       
-    stepper.setAcceleration(400);   
+    stepper.setMaxSpeed(100);       
+    stepper.setAcceleration(30);   
  
    TickType_t xLastWakeTime = xTaskGetTickCount();   
 
@@ -247,15 +248,13 @@ void gestion_moteur(void *pvParameters)
         if (xQueueReceive(q_dist_msg, &CAN_distance, 0) == pdTRUE)
         {
             
-            pas = (uint16_t)(CAN_distance.buf[0] | (CAN_distance.buf[1] << 8));
-            stepper.move(pas);
+        pas = (uint16_t)(CAN_distance.buf[0] | (CAN_distance.buf[1] << 8));
         xSemaphoreTake(Mutex, portMAX_DELAY);
-        Serial.printf("la distance du moteur est %d\n", pas);
+        Serial.printf("la distance  est %d\n", pas);
         xSemaphoreGive(Mutex);
-           
+        stepper.move(pas);           
         }
-        stepper.run();
-
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));   // période fixe de 1 ms
+         stepper.run();
+         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));   // période fixe de 1 ms
     }
 }
